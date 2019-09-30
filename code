@@ -1,0 +1,109 @@
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <windows.h>
+#include <winuser.h>
+using namespace std;
+
+const int SCREEN_WIDTH=64;
+const int SCREEN_HEIGHT=64;
+char screen[SCREEN_HEIGHT][SCREEN_WIDTH];
+const char border_ch='*';
+
+const char steve_ch='o';
+int steve_r, steve_c;
+
+const int MAX_TREES=5;
+const int MAX_STONES=20;
+const char tree_ch=194;
+const char stone_ch=254;
+
+bool end_game=false;
+
+const int MAX_TREE_HEALTH=3;
+const int MAX_STONE_HEALTH=5;
+int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
+
+void moveSteve(){
+    int n_r=steve_r, n_c=steve_c;
+    if (GetAsyncKeyState('D')) {n_c++;}
+    else if (GetAsyncKeyState('A')) {n_c--;}
+    else if (GetAsyncKeyState('W')) {n_r--;}
+    else if (GetAsyncKeyState('S')) {n_r++;}
+
+    if (screen[n_r][n_c]=='\0'){
+        screen[n_r][n_c]=steve_ch;
+        screen[steve_r][steve_c]='\0';
+        steve_r=n_r;
+        steve_c=n_c;
+    } else if (health_map[n_r][n_c]>0){
+        health_map[n_r][n_c]--;
+        if (health_map[n_r][n_c]==0){
+            screen[n_r][n_c]='\0';
+        }
+    }
+}
+
+void add_static_blocks(const int max_count, const char ch, const int health){
+    int br=0, r, c;
+    while (br<max_count){
+        r=rand()%SCREEN_HEIGHT;
+        c=rand()%SCREEN_WIDTH;
+        if (screen[r][c]=='\0'){
+            screen[r][c]=ch;
+            health_map[r][c]=health;
+            br++;
+        }
+    }
+}
+
+void init(){
+    for (int r=0; r<SCREEN_HEIGHT; r++){
+        screen[r][0]=border_ch;
+        health_map[r][0]=-1;
+        screen[r][SCREEN_WIDTH-1]=border_ch;
+        health_map[r][SCREEN_WIDTH-1]=-1;
+    }
+    for (int c=0; c<SCREEN_WIDTH; c++){
+        screen[0][c]=border_ch;
+        health_map[0][c]=-1;
+        screen[SCREEN_HEIGHT-1][c]=border_ch;
+        health_map[SCREEN_HEIGHT-1][c]=-1;
+    }
+
+    srand(time(NULL));
+    int r, c;
+    do {
+        r=rand()%SCREEN_HEIGHT;
+        c=rand()%SCREEN_WIDTH;
+        if (screen[r][c]=='\0'){
+            screen[r][c]=steve_ch;
+            steve_r=r;
+            steve_c=c;
+        }
+    } while (screen[r][c]!=steve_ch);
+
+    add_static_blocks(MAX_TREES, tree_ch, MAX_TREE_HEALTH);
+    add_static_blocks(MAX_STONES, stone_ch, MAX_STONE_HEALTH);
+}
+
+void print(){
+    system("CLS");
+    for (int r=0; r<SCREEN_HEIGHT; r++){
+        for (int c=0; c<SCREEN_WIDTH; c++){
+            cout << screen[r][c];
+        }
+        cout << endl;
+    }
+}
+
+int main(){
+    init();
+    print();
+    while (!end_game){
+        moveSteve();
+        print();
+        Sleep(200);
+    }
+    return 0;
+}
