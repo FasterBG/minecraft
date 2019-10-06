@@ -15,14 +15,52 @@ int steve_r, steve_c;
 
 const int MAX_TREES=5;
 const int MAX_STONES=20;
+const int MAX_ZOMBIES=5;
 const char tree_ch=194;
 const char stone_ch=254;
+const char zombie_ch = '&';
 
 bool end_game=false;
 
 const int MAX_TREE_HEALTH=3;
 const int MAX_STONE_HEALTH=5;
+const int MAX_ZOMBIE_HEALTH = 2;
 int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
+
+void moveZombie(int zombie_r, int zombie_c){
+    int direction = rand() % 4;
+    int n_r = zombie_r, n_c = zombie_c;
+    int zombie_health = health_map[zombie_r][zombie_c];
+    if(direction == 0){
+        // UP
+        n_r--;
+    }else if(direction == 1){
+        // DOWN
+        n_r++;
+    }else if(direction == 2){
+        // RIGTH
+        n_c++;
+    }else if(direction == 3){
+        // LEFT
+        n_c--;
+    }
+    if(screen[n_r][n_c] == '\0'){
+        screen[n_r][n_c] = zombie_ch;
+        screen[zombie_r][zombie_c] = '\0';
+        health_map[n_r][n_c] = zombie_health;
+        health_map[zombie_r][zombie_c] = 0;
+    }
+}
+
+void moveMobs(){
+    for(int r = 0; r < SCREEN_HEIGHT; r ++){
+        for(int c = 0; c < SCREEN_WIDTH; c ++){
+            if(screen[r][c] == zombie_ch){
+                moveZombie(r, c);
+            }
+        }
+    }
+}
 
 void moveSteve(){
     int n_r=steve_r, n_c=steve_c;
@@ -85,6 +123,7 @@ void init(){
 
     add_static_blocks(MAX_TREES, tree_ch, MAX_TREE_HEALTH);
     add_static_blocks(MAX_STONES, stone_ch, MAX_STONE_HEALTH);
+    add_static_blocks(MAX_ZOMBIES, zombie_ch, MAX_ZOMBIE_HEALTH);
 }
 
 void print(){
@@ -102,6 +141,7 @@ int main(){
     print();
     while (!end_game){
         moveSteve();
+        moveMobs();
         print();
         Sleep(200);
     }
