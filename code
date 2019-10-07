@@ -3,11 +3,14 @@
 #include <ctime>
 #include <windows.h>
 #include <winuser.h>
+#include <stdlib.h>
+
 using namespace std;
 
 const int SCREEN_WIDTH=64;
 const int SCREEN_HEIGHT=64;
-char screen[SCREEN_HEIGHT][SCREEN_WIDTH];
+const int UI_WIDTH = 16;
+char screen[SCREEN_WIDTH][SCREEN_HEIGHT];
 const char border_ch='*';
 
 const char steve_ch='o';
@@ -26,6 +29,82 @@ const int MAX_TREE_HEALTH=3;
 const int MAX_STONE_HEALTH=5;
 const int MAX_ZOMBIE_HEALTH = 2;
 int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
+
+const int pole_rows = SCREEN_HEIGHT;
+const int pole_cols = SCREEN_WIDTH + UI_WIDTH;
+
+int wood_inventory = 0;
+int stone_inventory = 0;
+
+HANDLE hConsoleOutput = ::GetStdHandle(STD_OUTPUT_HANDLE);
+COORD screen_buf = {pole_cols, pole_rows};
+CHAR_INFO blank_screen[(pole_rows) * (pole_cols)] = {0};
+
+enum COLORS {
+    BLACK = 0,
+    BLUE = FOREGROUND_BLUE,
+    CYAN = FOREGROUND_BLUE | FOREGROUND_GREEN,
+    GREEN = FOREGROUND_GREEN,
+    RED = FOREGROUND_RED,
+    BROWN = FOREGROUND_RED | FOREGROUND_GREEN,
+    PURPLE = FOREGROUND_RED | FOREGROUND_BLUE,
+    LIGHT_GREY =  FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN,
+
+    GREY = 0 | FOREGROUND_INTENSITY,
+    LIGHT_BLUE = FOREGROUND_BLUE | FOREGROUND_INTENSITY,
+    LIGHT_CYAN = FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+    LIGHT_GREEN = FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+    LIGHT_RED = FOREGROUND_RED | FOREGROUND_INTENSITY,
+    YELLOW = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY,
+    PINK = FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY,
+    WHITE =  FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY
+};
+
+const COLORS backgroundColor = LIGHT_GREEN;
+
+void draw_char(char ch, int y, int x, COLORS foreground_color, COLORS background_color) {
+    CHAR_INFO ch_info;
+    ch_info.Char.AsciiChar = ch;
+    ch_info.Attributes = foreground_color | (background_color << 4);
+
+    COORD buf_size = {1, 1};
+    COORD buf_coord = {0, 0};
+    SMALL_RECT screen_pos = {x, y, x+1, y+1};
+    ::WriteConsoleOutput(hConsoleOutput, &ch_info, buf_size, buf_coord, &screen_pos);
+
+}
+
+void clear_screen() {
+    COORD buf_coord = {0, 0};
+    SMALL_RECT screen_pos = {0, 0, screen_buf.X, screen_buf.Y};
+    ::WriteConsoleOutput(hConsoleOutput, blank_screen, screen_buf, buf_coord, &screen_pos);
+}
+
+void set_background() {
+    for (int i = 0; i < screen_buf.X; i++) {
+        for (int j = 0; j < screen_buf.Y; j++) {
+             draw_char(' ', j, i, BROWN, backgroundColor);
+        }
+    }
+}
+
+
+void init_console(){
+
+    SMALL_RECT rect = {0, 0, screen_buf.X, screen_buf.Y};
+
+    ::SetConsoleScreenBufferSize(hConsoleOutput, screen_buf);
+    ::SetConsoleWindowInfo(hConsoleOutput, TRUE, &rect);
+    ::SetConsoleTitle("MINECRAFT");
+    set_background();
+
+}
+
+void draw_str(char* str, int r, int c){
+    for(int i = 0; str[i]!='\0'; i++){
+        draw_char(str[i], r, c + i, BLACK, backgroundColor);
+    }
+}
 
 void moveZombie(int zombie_r, int zombie_c){
     int direction = rand() % 4;
@@ -46,7 +125,9 @@ void moveZombie(int zombie_r, int zombie_c){
     }
     if(screen[n_r][n_c] == '\0'){
         screen[n_r][n_c] = zombie_ch;
+        draw_char(zombie_ch, n_r, n_c, GREEN, backgroundColor);
         screen[zombie_r][zombie_c] = '\0';
+        draw_char('\0', zombie_r, zombie_c, GREEN, backgroundColor);
         health_map[n_r][n_c] = zombie_health;
         health_map[zombie_r][zombie_c] = 0;
     }
@@ -71,24 +152,34 @@ void moveSteve(){
 
     if (screen[n_r][n_c]=='\0'){
         screen[n_r][n_c]=steve_ch;
+        draw_char(steve_ch, n_r, n_c, BLACK, backgroundColor);
         screen[steve_r][steve_c]='\0';
+        draw_char('\0', steve_r, steve_c, BLACK, backgroundColor);
         steve_r=n_r;
         steve_c=n_c;
-    } else if (health_map[n_r][n_c]>0){
+    } else if (health_map[n_r][n_c]>1){
         health_map[n_r][n_c]--;
-        if (health_map[n_r][n_c]==0){
+    }else if (health_map[n_r][n_c] == 1){
+        if(screen[n_r][n_c] == tree_ch){
             screen[n_r][n_c]='\0';
+            draw_char('\0', n_r, n_c, BLACK, backgroundColor);
+            wood_inventory++;
+        }else if(screen[n_r][n_c] == stone_ch){
+            screen[n_r][n_c] = '\0';
+            draw_char('\0', n_r, n_c, BLACK, backgroundColor);
+            stone_inventory++;
         }
     }
 }
 
-void add_static_blocks(const int max_count, const char ch, const int health){
+void add_static_blocks(const int max_count, const char ch, const int health, COLORS infront, COLORS background){
     int br=0, r, c;
     while (br<max_count){
         r=rand()%SCREEN_HEIGHT;
         c=rand()%SCREEN_WIDTH;
         if (screen[r][c]=='\0'){
             screen[r][c]=ch;
+            draw_char(ch, r, c, infront, background);
             health_map[r][c]=health;
             br++;
         }
@@ -98,14 +189,18 @@ void add_static_blocks(const int max_count, const char ch, const int health){
 void init(){
     for (int r=0; r<SCREEN_HEIGHT; r++){
         screen[r][0]=border_ch;
+        draw_char(border_ch, r, 0, BLACK, backgroundColor);
         health_map[r][0]=-1;
         screen[r][SCREEN_WIDTH-1]=border_ch;
+        draw_char(border_ch, r, SCREEN_WIDTH-1, BLACK, backgroundColor);
         health_map[r][SCREEN_WIDTH-1]=-1;
     }
     for (int c=0; c<SCREEN_WIDTH; c++){
         screen[0][c]=border_ch;
+        draw_char(border_ch, 0, c, BLACK, backgroundColor);
         health_map[0][c]=-1;
         screen[SCREEN_HEIGHT-1][c]=border_ch;
+        draw_char(border_ch, SCREEN_HEIGHT-1, c, BLACK, backgroundColor);
         health_map[SCREEN_HEIGHT-1][c]=-1;
     }
 
@@ -116,33 +211,39 @@ void init(){
         c=rand()%SCREEN_WIDTH;
         if (screen[r][c]=='\0'){
             screen[r][c]=steve_ch;
+            draw_char(steve_ch, r, c, BLACK, backgroundColor);
             steve_r=r;
             steve_c=c;
         }
     } while (screen[r][c]!=steve_ch);
 
-    add_static_blocks(MAX_TREES, tree_ch, MAX_TREE_HEALTH);
-    add_static_blocks(MAX_STONES, stone_ch, MAX_STONE_HEALTH);
-    add_static_blocks(MAX_ZOMBIES, zombie_ch, MAX_ZOMBIE_HEALTH);
+    add_static_blocks(MAX_TREES, tree_ch, MAX_TREE_HEALTH, BROWN, backgroundColor);
+    add_static_blocks(MAX_STONES, stone_ch, MAX_STONE_HEALTH, GREY, backgroundColor);
+    add_static_blocks(MAX_ZOMBIES, zombie_ch, MAX_ZOMBIE_HEALTH, GREEN, backgroundColor);
 }
 
-void print(){
-    system("CLS");
-    for (int r=0; r<SCREEN_HEIGHT; r++){
-        for (int c=0; c<SCREEN_WIDTH; c++){
-            cout << screen[r][c];
-        }
-        cout << endl;
+void UpdateInventory(){
+    {
+    char buff[32];
+    itoa(wood_inventory, buff, 10);
+    draw_str("WOOD", 0, SCREEN_WIDTH + 2);
+    draw_str(buff, 0, SCREEN_WIDTH + 7);
+    }
+    {
+    char buff[32];
+    itoa(stone_inventory, buff, 10);
+    draw_str("STONE", 1, SCREEN_WIDTH + 2);
+    draw_str(buff, 1, SCREEN_WIDTH + 8);
     }
 }
 
 int main(){
+    init_console();
     init();
-    print();
     while (!end_game){
         moveSteve();
         moveMobs();
-        print();
+        UpdateInventory();
         Sleep(200);
     }
     return 0;
