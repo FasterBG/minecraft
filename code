@@ -22,19 +22,33 @@ const int MAX_ZOMBIES=5;
 const char tree_ch=194;
 const char stone_ch=254;
 const char zombie_ch = '&';
+const char cobblestone_ch = '#';
+const char wood_ch = '=';
 
 bool end_game=false;
 
-const int MAX_TREE_HEALTH=3;
-const int MAX_STONE_HEALTH=5;
+const int MAX_TREE_HEALTH = 3;
+const int MAX_STONE_HEALTH = 5;
 const int MAX_ZOMBIE_HEALTH = 2;
+const int MAX_COBBLESTONE_HEALTH = 3;
+const int MAX_WOOD_HEALTH = 2;
 int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
+int steveDirection;
+/*
+0 = UP
+1 = DOWN
+2 = LEFT
+3 = RIGTH
+*/
 
 const int pole_rows = SCREEN_HEIGHT;
 const int pole_cols = SCREEN_WIDTH + UI_WIDTH;
 
 int wood_inventory = 0;
 int stone_inventory = 0;
+
+int movedZombiesR[MAX_ZOMBIES], movedZombiesC[MAX_ZOMBIES];
+int counterForMovedZombies = 0;
 
 HANDLE hConsoleOutput = ::GetStdHandle(STD_OUTPUT_HANDLE);
 COORD screen_buf = {pole_cols, pole_rows};
@@ -88,7 +102,6 @@ void set_background() {
     }
 }
 
-
 void init_console(){
 
     SMALL_RECT rect = {0, 0, screen_buf.X, screen_buf.Y};
@@ -107,33 +120,53 @@ void draw_str(char* str, int r, int c){
 }
 
 void moveZombie(int zombie_r, int zombie_c){
-    int direction = rand() % 4;
-    int n_r = zombie_r, n_c = zombie_c;
-    int zombie_health = health_map[zombie_r][zombie_c];
-    if(direction == 0){
-        // UP
-        n_r--;
-    }else if(direction == 1){
-        // DOWN
-        n_r++;
-    }else if(direction == 2){
-        // RIGTH
-        n_c++;
-    }else if(direction == 3){
-        // LEFT
-        n_c--;
+    // Variable: Should we move or not
+    bool shouldMove = rand() % 2;
+    // For: Checking if the zombie was moved
+    for(int i = 0; i < MAX_ZOMBIES; i++){
+        if(zombie_r == movedZombiesR[i] && zombie_c == movedZombiesC[i]){
+            shouldMove = false;
+        }
     }
-    if(screen[n_r][n_c] == '\0'){
-        screen[n_r][n_c] = zombie_ch;
-        draw_char(zombie_ch, n_r, n_c, GREEN, backgroundColor);
-        screen[zombie_r][zombie_c] = '\0';
-        draw_char('\0', zombie_r, zombie_c, GREEN, backgroundColor);
-        health_map[n_r][n_c] = zombie_health;
-        health_map[zombie_r][zombie_c] = 0;
+    if(shouldMove){
+        int direction = rand() % 4;
+        int n_r = zombie_r, n_c = zombie_c;
+        int zombie_health = health_map[zombie_r][zombie_c];
+        if(direction == 0){
+            // UP
+            n_r--;
+        }else if(direction == 1){
+            // DOWN
+            n_r++;
+        }else if(direction == 2){
+            // RIGTH
+            n_c++;
+        }else if(direction == 3){
+            // LEFT
+            n_c--;
+        }
+        if(screen[n_r][n_c] == '\0'){
+            screen[n_r][n_c] = zombie_ch;
+            draw_char(zombie_ch, n_r, n_c, GREEN, backgroundColor);
+            screen[zombie_r][zombie_c] = '\0';
+            draw_char('\0', zombie_r, zombie_c, GREEN, backgroundColor);
+            health_map[n_r][n_c] = zombie_health;
+            health_map[zombie_r][zombie_c] = 0;
+            movedZombiesR[counterForMovedZombies] = n_r;
+            movedZombiesC[counterForMovedZombies] = n_c;
+            counterForMovedZombies++;
+        }
     }
 }
 
 void moveMobs(){
+    // For: restarting the arrays for moved zombies
+    for (int i = 0; i < MAX_ZOMBIES; i++){
+        movedZombiesR[i] = false;
+        movedZombiesC[i] = false;
+    }
+    // Restarting the counter
+    counterForMovedZombies = 0;
     for(int r = 0; r < SCREEN_HEIGHT; r ++){
         for(int c = 0; c < SCREEN_WIDTH; c ++){
             if(screen[r][c] == zombie_ch){
@@ -143,12 +176,45 @@ void moveMobs(){
     }
 }
 
+void checkForBuilding(char blockType, int blockHealth, int& needMaterial, char inputButton){
+    if(GetAsyncKeyState(inputButton) && needMaterial > 0){
+        int block_r = steve_r, block_c = steve_c;
+        if(steveDirection == 0){
+            block_c++;
+        }else if(steveDirection == 1){
+            block_c--;
+        }else if(steveDirection == 2){
+            block_r--;
+        }else if(steveDirection == 3){
+            block_r++;
+        }
+        if(screen[block_r][block_c] == '\0'){
+            screen[block_r][block_c] = blockType;
+            draw_char(blockType, block_r, block_c, GREY, backgroundColor);
+            health_map[block_r][block_c] = blockHealth;
+            needMaterial--;
+        }
+    }
+}
+
 void moveSteve(){
     int n_r=steve_r, n_c=steve_c;
-    if (GetAsyncKeyState('D')) {n_c++;}
-    else if (GetAsyncKeyState('A')) {n_c--;}
-    else if (GetAsyncKeyState('W')) {n_r--;}
-    else if (GetAsyncKeyState('S')) {n_r++;}
+    if (GetAsyncKeyState('D')) {
+        n_c++;
+        steveDirection = 0;
+    }
+    else if (GetAsyncKeyState('A')) {
+        n_c--;
+        steveDirection = 1;
+    }
+    else if (GetAsyncKeyState('W')) {
+        n_r--;
+        steveDirection = 2;
+    }
+    else if (GetAsyncKeyState('S')) {
+        n_r++;
+        steveDirection = 3;
+    }
 
     if (screen[n_r][n_c]=='\0'){
         screen[n_r][n_c]=steve_ch;
@@ -168,6 +234,14 @@ void moveSteve(){
             screen[n_r][n_c] = '\0';
             draw_char('\0', n_r, n_c, BLACK, backgroundColor);
             stone_inventory++;
+        }else if(screen[n_r][n_c] == cobblestone_ch){
+            screen[n_r][n_c] = '\0';
+            draw_char('\0', n_r, n_c, BLACK, backgroundColor);
+            stone_inventory++;
+        }else if(screen[n_r][n_c] == wood_ch){
+            screen[n_r][n_c] = '\0';
+            draw_char('\0', n_r, n_c, BLACK, backgroundColor);
+            wood_inventory++;
         }
     }
 }
@@ -203,7 +277,10 @@ void init(){
         draw_char(border_ch, SCREEN_HEIGHT-1, c, BLACK, backgroundColor);
         health_map[SCREEN_HEIGHT-1][c]=-1;
     }
-
+    for (int i = 0; i < MAX_ZOMBIES; i++){
+        movedZombiesC[i] = false;
+        movedZombiesR[i] = false;
+    }
     srand(time(NULL));
     int r, c;
     do {
@@ -226,14 +303,14 @@ void UpdateInventory(){
     {
     char buff[32];
     itoa(wood_inventory, buff, 10);
-    draw_str("WOOD", 0, SCREEN_WIDTH + 2);
-    draw_str(buff, 0, SCREEN_WIDTH + 7);
+    draw_str("WOOD(F):", 0, SCREEN_WIDTH + 4);
+    draw_str(buff, 0, SCREEN_WIDTH + 13);
     }
     {
     char buff[32];
     itoa(stone_inventory, buff, 10);
-    draw_str("STONE", 1, SCREEN_WIDTH + 2);
-    draw_str(buff, 1, SCREEN_WIDTH + 8);
+    draw_str("STONE(G):", 1, SCREEN_WIDTH + 3);
+    draw_str(buff, 1, SCREEN_WIDTH + 13);
     }
 }
 
@@ -243,6 +320,8 @@ int main(){
     while (!end_game){
         moveSteve();
         moveMobs();
+        checkForBuilding(cobblestone_ch, MAX_COBBLESTONE_HEALTH, stone_inventory, 'F');
+        checkForBuilding(wood_ch, MAX_WOOD_HEALTH, wood_inventory, 'G');
         UpdateInventory();
         Sleep(200);
     }
