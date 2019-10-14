@@ -10,11 +10,9 @@ using namespace std;
 const int SCREEN_WIDTH=64;
 const int SCREEN_HEIGHT=64;
 const int UI_WIDTH = 16;
-char screen[SCREEN_WIDTH][SCREEN_HEIGHT];
 const char border_ch='*';
 
 const char steve_ch='o';
-int steve_r, steve_c;
 
 const int MAX_TREES=5;
 const int MAX_STONES=20;
@@ -23,22 +21,45 @@ const char tree_ch=194;
 const char stone_ch=254;
 const char zombie_ch = '&';
 
-bool end_game=false;
-
 const int MAX_TREE_HEALTH=3;
 const int MAX_STONE_HEALTH=5;
 const int MAX_ZOMBIE_HEALTH = 2;
-int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 const int pole_rows = SCREEN_HEIGHT;
 const int pole_cols = SCREEN_WIDTH + UI_WIDTH;
 
-int wood_inventory = 0;
-int stone_inventory = 0;
+bool end_game=false;
+int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
+char screen[SCREEN_WIDTH][SCREEN_HEIGHT];
 
 HANDLE hConsoleOutput = ::GetStdHandle(STD_OUTPUT_HANDLE);
 COORD screen_buf = {pole_cols, pole_rows};
 CHAR_INFO blank_screen[(pole_rows) * (pole_cols)] = {0};
+
+struct TInventory{
+    int wood_inventory = 0;
+    int stone_inventory = 0;
+} ;
+
+TInventory inventory;
+
+class CPlayer{
+    public:
+        char screen_ch;
+        int player_r;
+        int player_c;
+        TInventory inventory;
+        void init();
+        void movePlayer();
+        CPlayer(char ch){
+            screen_ch = ch;
+            player_r = 0;
+            player_c = 0;
+            inventory.wood_inventory = 0;
+            inventory.stone_inventory = 0;
+            init();
+        }
+};
 
 enum COLORS {
     BLACK = 0,
@@ -87,7 +108,6 @@ void set_background() {
         }
     }
 }
-
 
 void init_console(){
 
@@ -143,33 +163,46 @@ void moveMobs(){
     }
 }
 
-void moveSteve(){
-    int n_r=steve_r, n_c=steve_c;
+void CPlayer::movePlayer(){
+    int n_r = player_r, n_c = player_c;
     if (GetAsyncKeyState('D')) {n_c++;}
     else if (GetAsyncKeyState('A')) {n_c--;}
     else if (GetAsyncKeyState('W')) {n_r--;}
     else if (GetAsyncKeyState('S')) {n_r++;}
-
     if (screen[n_r][n_c]=='\0'){
-        screen[n_r][n_c]=steve_ch;
-        draw_char(steve_ch, n_r, n_c, BLACK, backgroundColor);
-        screen[steve_r][steve_c]='\0';
-        draw_char('\0', steve_r, steve_c, BLACK, backgroundColor);
-        steve_r=n_r;
-        steve_c=n_c;
+        screen[n_r][n_c]=screen_ch;
+        draw_char(screen_ch, n_r, n_c, BLACK, backgroundColor);
+        screen[player_r][player_c]='\0';
+        draw_char('\0', player_r, player_c, BLACK, backgroundColor);
+        player_r = n_r;
+        player_c = n_c;
     } else if (health_map[n_r][n_c]>1){
         health_map[n_r][n_c]--;
     }else if (health_map[n_r][n_c] == 1){
         if(screen[n_r][n_c] == tree_ch){
             screen[n_r][n_c]='\0';
             draw_char('\0', n_r, n_c, BLACK, backgroundColor);
-            wood_inventory++;
+            inventory.wood_inventory++;
         }else if(screen[n_r][n_c] == stone_ch){
             screen[n_r][n_c] = '\0';
             draw_char('\0', n_r, n_c, BLACK, backgroundColor);
-            stone_inventory++;
+            inventory.stone_inventory++;
         }
     }
+}
+
+void CPlayer::init(){
+    int r, c;
+    do {
+        r=rand()%SCREEN_HEIGHT;
+        c=rand()%SCREEN_WIDTH;
+        if (screen[r][c]=='\0'){
+            screen[r][c]=screen_ch;
+            draw_char(screen_ch, r, c, BLACK, backgroundColor);
+            player_r = r;
+            player_c = c;
+        }
+    } while (screen[r][c]!=steve_ch);
 }
 
 void add_static_blocks(const int max_count, const char ch, const int health, COLORS infront, COLORS background){
@@ -205,33 +238,22 @@ void init(){
     }
 
     srand(time(NULL));
-    int r, c;
-    do {
-        r=rand()%SCREEN_HEIGHT;
-        c=rand()%SCREEN_WIDTH;
-        if (screen[r][c]=='\0'){
-            screen[r][c]=steve_ch;
-            draw_char(steve_ch, r, c, BLACK, backgroundColor);
-            steve_r=r;
-            steve_c=c;
-        }
-    } while (screen[r][c]!=steve_ch);
 
     add_static_blocks(MAX_TREES, tree_ch, MAX_TREE_HEALTH, BROWN, backgroundColor);
     add_static_blocks(MAX_STONES, stone_ch, MAX_STONE_HEALTH, GREY, backgroundColor);
     add_static_blocks(MAX_ZOMBIES, zombie_ch, MAX_ZOMBIE_HEALTH, GREEN, backgroundColor);
 }
 
-void UpdateInventory(){
+void UpdateInventory(TInventory& inventory){
     {
     char buff[32];
-    itoa(wood_inventory, buff, 10);
+    itoa(inventory.wood_inventory, buff, 10);
     draw_str("WOOD", 0, SCREEN_WIDTH + 2);
     draw_str(buff, 0, SCREEN_WIDTH + 7);
     }
     {
     char buff[32];
-    itoa(stone_inventory, buff, 10);
+    itoa(inventory.stone_inventory, buff, 10);
     draw_str("STONE", 1, SCREEN_WIDTH + 2);
     draw_str(buff, 1, SCREEN_WIDTH + 8);
     }
@@ -240,10 +262,11 @@ void UpdateInventory(){
 int main(){
     init_console();
     init();
+    CPlayer Steve(steve_ch);
     while (!end_game){
-        moveSteve();
         moveMobs();
-        UpdateInventory();
+        Steve.movePlayer();
+        UpdateInventory(Steve.inventory);
         Sleep(200);
     }
     return 0;
