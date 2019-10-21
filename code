@@ -64,24 +64,30 @@ enum COLORS {
     WHITE =  FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY
 };
 
+const COLORS backgroundColor = LIGHT_GREEN;
+
+const COLORS treeColor = BROWN;
+const COLORS stoneColor = GREY;
+
 class CPlayer{
+    private:
+        char ch_up;
+        char ch_left;
+        char ch_down;
+        char ch_right;
     public:
         char screen_ch;
-        char UP_ctrl;
-        char LEFT_ctrl;
-        char DOWN_ctrl;
-        char RIGHT_ctrl;
         int player_r;
         int player_c;
         TInventory inventory;
         void init();
         void movePlayer();
-        CPlayer(char ch, char up_ch, char left_ch, char down_ch, char right_ch){
+        CPlayer(char ch, char up, char left, char down, char right){
             screen_ch = ch;
-            UP_ctrl = up_ch;
-            LEFT_ctrl = left_ch;
-            DOWN_ctrl = down_ch;
-            RIGHT_ctrl = right_ch;
+            ch_up = up;
+            ch_left = left;
+            ch_down = down;
+            ch_right = right;
             player_r = 0;
             player_c = 0;
             inventory.wood_inventory = 0;
@@ -107,8 +113,17 @@ public:
     }
 };
 
+class CStaticObject{
+public:
+    int object_r;
+    int object_c;
+    char screen_ch;
+    COLORS color;
+    int health;
+    void init(char _screen_ch, int _health, COLORS _color);
+    CStaticObject(){};
+};
 
-const COLORS backgroundColor = LIGHT_GREEN;
 
 void draw_char(char ch, int y, int x, COLORS foreground_color, COLORS background_color) {
     CHAR_INFO ch_info;
@@ -153,12 +168,26 @@ void draw_str(char* str, int r, int c){
     }
 }
 
+void CPlayer::init(){
+    int r, c;
+    do {
+        r=rand()%SCREEN_HEIGHT;
+        c=rand()%SCREEN_WIDTH;
+        if (screen[r][c]=='\0'){
+            screen[r][c]=screen_ch;
+            draw_char(screen_ch, r, c, BLACK, backgroundColor);
+            player_r = r;
+            player_c = c;
+        }
+    } while (screen[r][c]!=screen_ch);
+}
+
 void CPlayer::movePlayer(){
     int n_r = player_r, n_c = player_c;
-    if (GetAsyncKeyState(RIGHT_ctrl)) {n_c++;}
-    else if (GetAsyncKeyState(LEFT_ctrl)) {n_c--;}
-    else if (GetAsyncKeyState(UP_ctrl)) {n_r--;}
-    else if (GetAsyncKeyState(DOWN_ctrl)) {n_r++;}
+    if (GetAsyncKeyState(ch_right)) {n_c++;}
+    else if (GetAsyncKeyState(ch_left)) {n_c--;}
+    else if (GetAsyncKeyState(ch_up)) {n_r--;}
+    else if (GetAsyncKeyState(ch_down)) {n_r++;}
     if (screen[n_r][n_c]=='\0'){
         screen[n_r][n_c]=screen_ch;
         draw_char(screen_ch, n_r, n_c, BLACK, backgroundColor);
@@ -181,16 +210,19 @@ void CPlayer::movePlayer(){
     }
 }
 
-void CPlayer::init(){
+void CStaticObject::init(char _screen_ch, int _health, COLORS _color){
+    screen_ch = _screen_ch;
+    health = _health;
+    color = _color;
     int r, c;
     do {
-        r=rand()%SCREEN_HEIGHT;
-        c=rand()%SCREEN_WIDTH;
+        r = rand()%SCREEN_HEIGHT;
+        c = rand()%SCREEN_WIDTH;
         if (screen[r][c]=='\0'){
-            screen[r][c]=screen_ch;
-            draw_char(screen_ch, r, c, BLACK, backgroundColor);
-            player_r = r;
-            player_c = c;
+            screen[r][c] = screen_ch;
+            draw_char(screen_ch, r, c, color, backgroundColor);
+            object_r = r;
+            object_c = c;
         }
     } while (screen[r][c]!=screen_ch);
 }
@@ -272,9 +304,6 @@ void init(){
     }
 
     srand(time(NULL));
-
-    add_static_blocks(MAX_TREES, tree_ch, MAX_TREE_HEALTH, BROWN, backgroundColor);
-    add_static_blocks(MAX_STONES, stone_ch, MAX_STONE_HEALTH, GREY, backgroundColor);
 }
 
 void UpdateInventory(TInventory& inventory){
@@ -298,6 +327,14 @@ int main(){
     CPlayer Steve(steve_ch, 'W', 'A', 'S', 'D');
     CPlayer Alex(alex_ch, 'I', 'J', 'K', 'L');
     CZombie Zombie(zombie_ch, GREEN);
+    CStaticObject trees[MAX_TREES];
+    CStaticObject stones[MAX_STONES];
+    for(int i = 0; i < MAX_TREES; i++){
+        trees[i].init(tree_ch, MAX_TREE_HEALTH, treeColor);
+    }
+    for(int i = 0; i < MAX_STONES; i++){
+        stones[i].init(stone_ch, MAX_STONE_HEALTH, stoneColor);
+    }
     while (!end_game){
         Zombie.moveZombie();
         Steve.movePlayer();
