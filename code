@@ -30,7 +30,6 @@ const int pole_rows = SCREEN_HEIGHT;
 const int pole_cols = SCREEN_WIDTH + UI_WIDTH;
 
 bool end_game=false;
-int health_map[SCREEN_HEIGHT][SCREEN_WIDTH];
 char screen[SCREEN_WIDTH][SCREEN_HEIGHT];
 
 HANDLE hConsoleOutput = ::GetStdHandle(STD_OUTPUT_HANDLE);
@@ -40,7 +39,7 @@ CHAR_INFO blank_screen[(pole_rows) * (pole_cols)] = {0};
 struct TInventory{
     int wood_inventory = 0;
     int stone_inventory = 0;
-} ;
+};
 
 TInventory inventory;
 
@@ -68,34 +67,7 @@ const COLORS backgroundColor = LIGHT_GREEN;
 
 const COLORS treeColor = BROWN;
 const COLORS stoneColor = GREY;
-const COLORS zombieColor = GREEN;
-
-class CPlayer{
-    private:
-        char ch_up;
-        char ch_left;
-        char ch_down;
-        char ch_right;
-    public:
-        char screen_ch;
-        int player_r;
-        int player_c;
-        TInventory inventory;
-        void init();
-        void movePlayer();
-        CPlayer(char ch, char up, char left, char down, char right){
-            screen_ch = ch;
-            ch_up = up;
-            ch_left = left;
-            ch_down = down;
-            ch_right = right;
-            player_r = 0;
-            player_c = 0;
-            inventory.wood_inventory = 0;
-            inventory.stone_inventory = 0;
-            init();
-        }
-};
+const COLORS zombieColor = RED;
 
 class CZombie{
 public:
@@ -125,6 +97,38 @@ public:
     void init(char _screen_ch, int _health, COLORS _color);
     CStaticObject(){};
 };
+
+class CPlayer{
+    private:
+        char ch_up;
+        char ch_left;
+        char ch_down;
+        char ch_right;
+    public:
+        char screen_ch;
+        int player_r;
+        int player_c;
+        TInventory inventory;
+        void init();
+        void movePlayer();
+        int findObject(CStaticObject* objects, int max_objects, int _r, int _c);
+        CPlayer(char ch, char up, char left, char down, char right){
+            screen_ch = ch;
+            ch_up = up;
+            ch_left = left;
+            ch_down = down;
+            ch_right = right;
+            player_r = 0;
+            player_c = 0;
+            inventory.wood_inventory = 0;
+            inventory.stone_inventory = 0;
+            init();
+        }
+};
+
+CStaticObject trees[MAX_TREES];
+CStaticObject stones[MAX_STONES];
+CZombie zombies[MAX_ZOMBIES];
 
 void draw_char(char ch, int y, int x, COLORS foreground_color, COLORS background_color) {
     CHAR_INFO ch_info;
@@ -183,6 +187,14 @@ void CPlayer::init(){
     } while (screen[r][c]!=screen_ch);
 }
 
+int CPlayer::findObject(CStaticObject* objects, int max_objects, int _r, int _c){
+    for(int i = 0; i < max_objects; i++){
+        if(objects[i].object_r == _r && objects[i].object_c == _c){
+            return i;
+        }
+    }
+};
+
 void CPlayer::movePlayer(){
     int n_r = player_r, n_c = player_c;
     if (GetAsyncKeyState(ch_right)) {n_c++;}
@@ -196,17 +208,25 @@ void CPlayer::movePlayer(){
         draw_char('\0', player_r, player_c, BLACK, backgroundColor);
         player_r = n_r;
         player_c = n_c;
-    } else if (health_map[n_r][n_c]>1){
-        health_map[n_r][n_c]--;
-    }else if (health_map[n_r][n_c] == 1){
-        if(screen[n_r][n_c] == tree_ch){
-            screen[n_r][n_c]='\0';
-            draw_char('\0', n_r, n_c, BLACK, backgroundColor);
+    } else if (screen[n_r][n_c] == tree_ch){
+        int id = findObject(trees, MAX_TREES, n_r, n_c);
+        if(trees[id].health > 1){
+            trees[id].health--;
+        } else{
             inventory.wood_inventory++;
-        }else if(screen[n_r][n_c] == stone_ch){
+            draw_char('\0', n_r, n_c, backgroundColor, backgroundColor);
+            trees[id].object_r = -1;
             screen[n_r][n_c] = '\0';
-            draw_char('\0', n_r, n_c, BLACK, backgroundColor);
+        }
+    } else if (screen[n_r][n_c] == stone_ch){
+        int id = findObject(stones, MAX_STONES, n_r, n_c);
+        if(stones[id].health > 1){
+            stones[id].health--;
+        } else{
             inventory.stone_inventory++;
+            draw_char('\0', n_r, n_c, backgroundColor, backgroundColor);
+            stones[id].object_r = -1;
+            screen[n_r][n_c] = '\0';
         }
     }
 }
@@ -250,7 +270,6 @@ void CZombie::init(char ch, COLORS color){
 void CZombie::moveZombie(){
     int direction = rand() % 4;
     int n_r = object_r, n_c = object_c;
-    int zombie_health = health_map[object_r][object_c];
     if(direction == 0){
         // UP
         n_r--;
@@ -269,8 +288,6 @@ void CZombie::moveZombie(){
         draw_char(screen_ch, n_r, n_c, object_color, backgroundColor);
         screen[object_r][object_c] = '\0';
         draw_char('\0', object_r, object_c, object_color, backgroundColor);
-        health_map[n_r][n_c] = zombie_health;
-        health_map[object_r][object_c] = 0;
         object_r = n_r;
         object_c = n_c;
     }
@@ -281,36 +298,28 @@ void init(){
     for (int r=0; r<SCREEN_HEIGHT; r++){
         screen[r][0]=border_ch;
         draw_char(border_ch, r, 0, BLACK, backgroundColor);
-        health_map[r][0]=-1;
         screen[r][SCREEN_WIDTH-1]=border_ch;
         draw_char(border_ch, r, SCREEN_WIDTH-1, BLACK, backgroundColor);
-        health_map[r][SCREEN_WIDTH-1]=-1;
     }
     for (int c=0; c<SCREEN_WIDTH; c++){
         screen[0][c]=border_ch;
         draw_char(border_ch, 0, c, BLACK, backgroundColor);
-        health_map[0][c]=-1;
         screen[SCREEN_HEIGHT-1][c]=border_ch;
         draw_char(border_ch, SCREEN_HEIGHT-1, c, BLACK, backgroundColor);
-        health_map[SCREEN_HEIGHT-1][c]=-1;
     }
 
     srand(time(NULL));
 }
 
-void UpdateInventory(TInventory& inventory){
-    {
+void UpdateInventory(TInventory& inventory, int startingRow){
     char buff[32];
     itoa(inventory.wood_inventory, buff, 10);
-    draw_str("WOOD", 0, SCREEN_WIDTH + 2);
-    draw_str(buff, 0, SCREEN_WIDTH + 7);
-    }
-    {
-    char buff[32];
+    draw_str("WOOD", startingRow, SCREEN_WIDTH + 2);
+    draw_str(buff, startingRow, SCREEN_WIDTH + 7);
+
     itoa(inventory.stone_inventory, buff, 10);
-    draw_str("STONE", 1, SCREEN_WIDTH + 2);
-    draw_str(buff, 1, SCREEN_WIDTH + 8);
-    }
+    draw_str("STONE", startingRow + 1, SCREEN_WIDTH + 2);
+    draw_str(buff, startingRow + 1, SCREEN_WIDTH + 8);
 }
 
 int main(){
@@ -318,11 +327,8 @@ int main(){
     init();
     CPlayer Steve(steve_ch, 'W', 'A', 'S', 'D');
     CPlayer Alex(alex_ch, 'I', 'J', 'K', 'L');
-
-    CStaticObject trees[MAX_TREES];
-    CStaticObject stones[MAX_STONES];
-    CZombie zombies[MAX_ZOMBIES];
-
+    draw_str("STEVE:", 0, SCREEN_WIDTH + 2);
+    draw_str("ALEX:", 4, SCREEN_WIDTH + 2);
     for(int i = 0; i < MAX_TREES; i++){
         trees[i].init(tree_ch, MAX_TREE_HEALTH, treeColor);
     }
@@ -336,10 +342,12 @@ int main(){
         for(int i = 0; i < MAX_ZOMBIES; i++){
             zombies[i].moveZombie();
         }
-        
+
         Steve.movePlayer();
         Alex.movePlayer();
-        UpdateInventory(Steve.inventory);
+
+        UpdateInventory(Steve.inventory, 1);
+        UpdateInventory(Alex.inventory, 5);
         Sleep(200);
     }
     return 0;
