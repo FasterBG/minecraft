@@ -68,6 +68,7 @@ const COLORS backgroundColor = LIGHT_GREEN;
 
 const COLORS treeColor = BROWN;
 const COLORS stoneColor = GREY;
+const COLORS zombieColor = GREEN;
 
 class CPlayer{
     private:
@@ -102,14 +103,15 @@ public:
     COLORS object_color;
     int object_r;
     int object_c;
-    void init();
+    void init(char ch, COLORS color);
     void moveZombie();
+    CZombie(){};
     CZombie(char ch, COLORS color){
         screen_ch = ch;
         object_color = color;
         int object_r = 0;
         int object_c = 0;
-        init();
+        init(ch, color);
     }
 };
 
@@ -123,7 +125,6 @@ public:
     void init(char _screen_ch, int _health, COLORS _color);
     CStaticObject(){};
 };
-
 
 void draw_char(char ch, int y, int x, COLORS foreground_color, COLORS background_color) {
     CHAR_INFO ch_info;
@@ -227,8 +228,12 @@ void CStaticObject::init(char _screen_ch, int _health, COLORS _color){
     } while (screen[r][c]!=screen_ch);
 }
 
-void CZombie::init(){
+void CZombie::init(char ch, COLORS color){
     int r, c;
+    screen_ch = ch;
+    object_color = color;
+
+    bool isSet = false;
     do {
         r = rand()%SCREEN_HEIGHT;
         c = rand()%SCREEN_WIDTH;
@@ -237,8 +242,9 @@ void CZombie::init(){
             draw_char(screen_ch, r, c, object_color, backgroundColor);
             object_r = r;
             object_c = c;
+            isSet = true;
         }
-    } while (screen[r][c]!=screen_ch);
+    } while (!isSet);
 }
 
 void CZombie::moveZombie(){
@@ -269,20 +275,6 @@ void CZombie::moveZombie(){
         object_c = n_c;
     }
 
-}
-
-void add_static_blocks(const int max_count, const char ch, const int health, COLORS infront, COLORS background){
-    int br=0, r, c;
-    while (br<max_count){
-        r=rand()%SCREEN_HEIGHT;
-        c=rand()%SCREEN_WIDTH;
-        if (screen[r][c]=='\0'){
-            screen[r][c]=ch;
-            draw_char(ch, r, c, infront, background);
-            health_map[r][c]=health;
-            br++;
-        }
-    }
 }
 
 void init(){
@@ -326,17 +318,25 @@ int main(){
     init();
     CPlayer Steve(steve_ch, 'W', 'A', 'S', 'D');
     CPlayer Alex(alex_ch, 'I', 'J', 'K', 'L');
-    CZombie Zombie(zombie_ch, GREEN);
+
     CStaticObject trees[MAX_TREES];
     CStaticObject stones[MAX_STONES];
+    CZombie zombies[MAX_ZOMBIES];
+
     for(int i = 0; i < MAX_TREES; i++){
         trees[i].init(tree_ch, MAX_TREE_HEALTH, treeColor);
     }
     for(int i = 0; i < MAX_STONES; i++){
         stones[i].init(stone_ch, MAX_STONE_HEALTH, stoneColor);
     }
+    for(int i = 0; i < MAX_ZOMBIES; i++){
+        zombies[i].init(zombie_ch, zombieColor);
+    }
     while (!end_game){
-        Zombie.moveZombie();
+        for(int i = 0; i < MAX_ZOMBIES; i++){
+            zombies[i].moveZombie();
+        }
+        
         Steve.movePlayer();
         Alex.movePlayer();
         UpdateInventory(Steve.inventory);
